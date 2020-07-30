@@ -1,0 +1,511 @@
+#!/bin/env bash;
+########################################################################################################################
+## name        : log.func
+## desc        : logRecord
+########################################################################################################################
+
+##################################
+#        Log Param & Func        #
+##################################
+
+# reserve param
+logParamList(){
+cat <<END
+=================================================================
+Log Base Function :
+    logBaseDir:              日志基础路径
+    logInfoColor:            普通日志颜色
+    logWarnColor:            警告日志颜色
+    logErrorColor:           错误日志颜色
+    logExceptionColor:       异常日志颜色
+    logEndColor:             日志结束后的颜色
+    
+    logScriptName:           日志来源脚本的名称
+    _logScriptNameLast:      上一个脚本的名称
+    logScriptSeq:            日志脚本的序号
+    _logScriptSeqLast:       上一个脚本的序号
+    logBusiName:             业务名称
+    logBusiExecuteType:      业务下的执行类型（在记录前需要提前指定）
+                             又是日志文件的名称
+                             
+    logFileMaxRowCnt:        日志文件最大记录数
+    logFileRowCntNow:        当前日志文件记录数
+    logThisTime:             日志当前时间    
+    
+    logScriptSeqFile:        脚本序列记录文件（序号、脚本名、时间）
+    logScriptSeqFilePath:    脚本序列记录文件的存放目录
+    logScriptSeqFileDeli:    脚本序列记录文件分隔符
+    
+    logIsErrorExit:          遇到错误是否退出（true/false）
+=================================================================    
+Script Monitor :
+    logMonitorParam1:        监控器参数一（日志函数文件名及绝对目录）
+    logMonitorParam2:        监控器参数二（日志存放的绝对目录）
+    logMonitorParam3:        监控器参数三（业务名称）
+    logMonitorParam4:        监控器参数四（待监控脚本名称）
+    logMonitorParam5:        监控器参数五（执行类型）
+    logMonitorInterval:      监控间隔
+    logMonitorMaxTimeOut:    监控超时时间（秒）
+    logMonitorMaxCount:      监控次数（计算结果）
+    
+    logMonitorFile:          待监控的日志文件（脚本执行输出定向位置）
+    logMonitorFileLock:      日志文件锁
+    logMonitorScript:        监控脚本（自动生成）
+    
+    logReadThisLine:         当前监控日志的行数
+    logReadLastLine:         上一次监控日志行数
+    logReadCount:            空执行次数（控制超时）
+    logMonitorLockStatus:    监控锁状态
+    logOldIfs:               遍历日志文件时分隔符控制
+=================================================================
+END
+}
+
+# reserve function
+
+logFuncList(){
+cat <<END
+=================================================================
+Log Base Function :
+    logParamSet:                 日志参数
+    logInit:                     日志初始化
+    logUpdateColorSet:           更新颜色组
+    
+    logSetBaseDir:               设置日志路径
+    logSetScriptName:            设置日志输出的脚本名
+    logSetBusiName:              设置业务名称
+    logSetFileSeq:               设置脚本序号（自动检查）
+    logSetExecuteType:           设置执行类型（即日志文件名）
+    logSetErrorExit:             设置错误是否退出
+    
+    logUpdateScriptSeq:          更新脚本序号
+    logCheckMaxRow:              日志记录行数检查及备份
+    logInsertSeqInfo:            插入序列信息
+    logCheckEssentialParam:      检查必备参数
+    logVerfDir:                  校验目录存在
+    
+    logInfo:                     记录常规信息
+    logWarn:                     记录警告信息
+    logError:                    记录错误信息
+    logException:                记录异常信息
+    logErrorExit:                遇错误退出
+=================================================================    
+Script Monitor :
+    logMonitor:                  监控器初始化
+    logMonitorStart:             开始监控
+    logMonitorShutDown:          结束监控
+    logMonitorUsage:             监控器参数说明
+    logMonitorCheckParam:        检查输入参数
+                                 
+    logMonitorSetFileParam:      初始化文件参数
+    logMonitorSetScriptName:     设置待监控脚本名
+    logMonitorSetExecutionType:  设置执行类型
+    logMonitorScriptGenerator:   监控脚本生成器
+    logMonitorSetLock:           监控锁操作
+    logMonitorLock:              监控加锁
+    logMonitorUnLock:            监控解锁
+=================================================================
+END
+}
+##################################
+
+##################################
+#        Log Base Function       #
+##################################
+# log local params
+logParamSet(){
+    logScriptSeqFileDeli=":::"
+    logFileMaxRowCnt="100000"
+}
+
+# initial process
+logInit(){
+    logParamSet
+    
+    
+    if [ x"$logBaseDir" == "x" ]; then
+        echo  "set logBaseDir first"
+        exit 7
+    fi
+    
+    if [ $# -ne 2 ];then
+        echo "Usage: logInit ScriptName BusiName"
+        exit 4
+    else
+        logSetBusiName $1
+        shift
+        logSetScriptName $1
+    fi
+}
+
+# set info color after got logScriptSeq and logScriptName
+logUpdateColorSet(){
+    # Color Set:
+    # 30（black）、31（red）、32（green）、 33（yellow）、34（blue）、35（carmine）、36（cyan）、37（white）
+    logInfoColor="\e[1;34m`date`:\e[1;36m[${logScriptSeq}:${logScriptName}]:\e[1;32m"
+    logWarnColor="\e[1;34m`date`:\e[1;36m[${logScriptSeq}:${logScriptName}]:\e[1;33m"
+    logErrorColor="\e[1;34m`date`:\e[1;36m[${logScriptSeq}:${logScriptName}]:\e[1;31m"
+    logExceptionColor="\e[1;34m`date`:\e[1;36m[${logScriptSeq}:${logScriptName}]:\e[1;35m"
+    logEndColor="\e[0m"
+}
+
+# set log directory
+logSetBaseDir() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logSetBaseDir BaseDir"
+        exit 4
+    else
+        logBaseDir=$1
+    fi
+}
+
+# set log source script and update script sequence using double check
+logSetScriptName() {
+    logScriptName=$1
+    if [ ! x"${logBusiName}" == "x" ]; then
+       logUpdateScriptSeq
+    fi
+}
+
+# set log source business and update script sequence using double check
+logSetBusiName() {
+   logBusiName=$1
+   if [ ! x"${logScriptName}" == "x" ]; then
+       logUpdateScriptSeq
+   fi
+}
+
+# set script sequence by logScriptSeq.txt
+logSetFileSeq(){
+    logScriptSeqFilePath=$logBaseDir/$logBusiName
+    logVerfDir $logScriptSeqFilePath
+    logScriptSeqFile=$logScriptSeqFilePath/logScriptSeq.txt
+}
+
+# update script sequence 
+logUpdateScriptSeq() {
+    logSetFileSeq
+    if [ ! -f ${logScriptSeqFile} ]; then
+        logScriptSeq=1
+        logInsertSeqInfo
+    else
+        _logScriptSeqLast=$(tail -1 ${logScriptSeqFile} | awk -F "${logScriptSeqFileDeli}" '{print $1}')
+        _logScriptNameLast=$(tail -1 ${logScriptSeqFile} | awk -F "${logScriptSeqFileDeli}" '{print $2}')
+        if [ ! x"$_logScriptNameLast" == x"$logScriptName" ];then
+            logScriptSeq=$[ $_logScriptSeqLast + 1 ]
+        else
+            logScriptSeq=$_logScriptSeqLast 
+        fi
+        logInsertSeqInfo
+    fi
+}
+
+# check and backup log file if it meets logFileMaxRowCnt
+logCheckMaxRow(){
+    if [ -f $logScriptSeqFilePath/${logBusiExecuteType}.log ];then
+        logFileRowCntNow=`wc -l $logScriptSeqFilePath/${logBusiExecuteType}.log | awk -F " " '{print $1}'`
+    fi
+
+    if [[ $logFileRowCntNow -gt $logFileMaxRowCnt ]];then
+    	  logThisTime=`date +"%Y%m%d%H%M%S"`
+    	  head -$MAXCNT $logScriptSeqFilePath/${logBusiExecuteType}.log > $logScriptSeqFilePath/${logBusiExecuteType}.log"$logThisTime"
+        sed -i "1,${logFileMaxRowCnt}d" $logScriptSeqFilePath/${logBusiExecuteType}.log
+    fi
+}
+
+# insert script sequence info into logScriptSeqFile
+logInsertSeqInfo() {
+    logCheckMaxRow
+    echo ${logScriptSeq}${logScriptSeqFileDeli}${logScriptName}${logScriptSeqFileDeli}$(date)  >> $logScriptSeqFile
+    logUpdateColorSet
+}
+
+# set logType, it will be the current log file name
+logSetExecuteType() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logSetExecuteType logType"
+        exit 4
+    else
+        logBusiExecuteType=$1
+    fi
+}
+
+# #deprecated#:check whether essential params are set before params initialized
+logCheckEssentialParam(){
+    if [ x"$logBusiExecuteType" == "x" ] || [ x"$logScriptSeqFilePath" == "x" ];then
+        echo "set logBusiExecuteType/logScriptSeqFilePath first"
+        exit 8
+    fi
+}
+
+# record common info
+logInfo() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logInfo info"
+    else
+        logUpdateColorSet
+        echo -e ${logInfoColor}"$1"${logEndColor} >> $logScriptSeqFilePath/${logBusiExecuteType}.log
+    fi
+}
+
+# record warning info
+logWarn() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logWarn warning"
+    else
+        logUpdateColorSet
+        echo -e ${logWarnColor}"$1"${logEndColor} >> $logScriptSeqFilePath/${logBusiExecuteType}.log
+    fi
+}
+
+# record error info
+logError() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logError error"
+    else
+        logUpdateColorSet
+        echo -e ${logErrorColor}"$1"${logEndColor} >> $logScriptSeqFilePath/${logBusiExecuteType}.log
+    fi
+}
+
+logException() {
+    if [ $# -ne 1 ];then
+        echo "Usage: logException exception"
+    else
+        logUpdateColorSet
+        echo -e ${logExceptionColor}"$1"${logEndColor} >> $logScriptSeqFilePath/${logBusiExecuteType}.log
+    fi
+}
+
+# set whether exit program when record error msg
+logSetErrorExit() {
+    if [ x"$1" == x"true" ] || [ x"$1" == x"false" ];then
+        logIsErrorExit=$1
+    else
+        echo "Usage: logSetErrorExit true/false"
+    fi
+}
+
+# judge whether exit program with error msg
+logErrorExit() {
+    if [ x"$logIsErrorExit" == x"true" ];then
+        exit 9
+    fi
+}
+
+# make sure dir is there
+logVerfDir() {
+    if [ ! -d $1 ];then
+       mkdir -p $1
+    fi
+}
+##################################
+
+
+
+##################################
+#        Script Monitor          #
+##################################
+logMonitor() {
+
+    if [ $# -ne 5 ];then
+        logMonitorUsage
+        exit 13
+    fi
+    
+    # log function file with full path
+    logMonitorParam1=$1
+    
+    # log base path
+    logMonitorParam2=$2
+    
+    # business name
+    logMonitorParam3=$3
+    
+    # script to be running
+    logMonitorParam4=$4
+    
+    # execution type
+    logMonitorParam5=$5
+
+    # monitor param settings
+    logMonitorInterval=3
+    logMonitorMaxTimeOut=150
+    logMonitorMaxCount=$[ $logMonitorMaxTimeOut / $logMonitorInterval ]
+    
+    # set file param
+    logMonitorSetFileParam
+    
+    # set lock
+    logMonitorLock
+    touch $logMonitorFile
+    
+    ## start monitor
+    #logMonitorStart    
+}
+
+
+logMonitorStart(){
+    #generate monitor
+    logMonitorScriptGenerator
+    
+    # execute monitor
+    sh $logMonitorScript &
+}
+
+logMonitorShutDown(){
+    logMonitorUnLock
+}
+
+logMonitorSetFileParam(){
+    logMonitorFile=$logScriptSeqFilePath/.$$.log
+    logMonitorFileLock=$logScriptSeqFilePath/.$$.log.lock
+    logMonitorScript=$logScriptSeqFilePath/.$$.sh
+}
+
+logMonitorUsage(){
+    cat <<< END
+=====================================================
+    logMonitor 参数说明（按次序）：
+    1.日志功能文件的绝对路径及文件名
+    2.日志目录的绝对路径
+    3.业务名称（参考日志功能）
+    4.将要执行的被监控的脚本
+    5.执行类型（参考日志功能）
+=====================================================    
+END
+}
+
+logMonitorCheckParam(){
+    # check log function file with full path
+    if [ ! -f $logMonitorParam1 ];then
+        echo "log function file not exsits"
+        exit 14
+    fi
+    
+    # log base path
+    if [ ! -d $logMonitorParam2 ];then
+        echo "log base directory not exsits"
+        exit 14
+    fi
+    
+    # # business name
+    # logMonitorParam3
+    # 
+    # # script to be running
+    # logMonitorParam4
+    # 
+    # # execution type
+    # logMonitorParam5
+}
+
+## modify param if need, remeber call logMonitorStart after everything is ready
+## if you need switch business, please initial a new monitor
+logMonitorSetScriptName(){
+    if [ $# -ne 1 ];then
+        echo "Usage: logMonitorSetScriptName  scriptName"
+        exit 13
+    else
+        logMonitorParam4=$1
+        logMonitorSetFileParam
+    fi
+}
+
+logMonitorSetExecutionType(){
+    if [ $# -ne 1 ];then
+        echo "Usage: logMonitorSetExecutionType  executionType"
+        exit 13
+    else
+        logMonitorParam5=$1
+        logMonitorSetFileParam
+    fi
+}
+
+
+
+## generate monitor script
+logMonitorScriptGenerator(){
+    echo "
+    source $logMonitorParam1
+    logSetBaseDir $logMonitorParam2
+    logInit $logMonitorParam3 $logMonitorParam4
+    logSetExecuteType $logMonitorParam5
+    
+    logReadException(){
+        if [ -f $logMonitorFile ];then
+            logReadThisLine=\$(wc -l $logMonitorFile | awk '{print \$1}')
+            
+            if [ \$logReadThisLine -ge \$logReadLastLine ];then
+                 logOldIfs=\$IFS
+                 IFS=\$'\n'
+                 for line in \$( sed -n \"\${logReadLastLine},\${logReadThisLine}p\" $logMonitorFile )
+                 do
+                     logException \"EXEC: \$line\"
+                 done
+                 IFS=\$logOldIfs
+                 logReadLastLine=\$[ \$logReadThisLine + 1 ]
+                 logReadCount=0
+            else
+                 logReadCount=\$[ \$logReadCount + 1 ]
+            fi
+        fi
+    }
+    
+    logMonitorExceedMaxTime(){
+        if [ \$logReadCount -ge $logMonitorMaxCount ];then
+            logException \"EXCEPTION: MONITOR SCRIPT TIMEOUT\"
+            logMonitorClean
+            exit 12
+        fi
+    }
+    
+    logMonitorClean(){
+        rm $logMonitorFile
+        rm $logMonitorFileLock
+        rm $logMonitorScript
+    }
+    
+    logReadCount=0
+    logReadLastLine=1
+    logReadThisLine=1
+        
+    while true
+    do
+        sleep $logMonitorInterval
+        
+        logReadException
+        logMonitorExceedMaxTime
+        
+        logMonitorLockStatus=\$( cat $logMonitorFileLock )
+        if [ x\$logMonitorLockStatus == xunlock ];then
+            logReadException
+            logMonitorClean
+            break;
+        fi
+        
+    done  " > $logMonitorScript
+}
+
+logMonitorSetLock(){
+    if [ x"$logMonitorFileLock" == "x" ];then
+        logError "set up logMonitor first"
+        exit 11
+    fi
+    
+    if [ x"$1" == "xlock" ] || [ x"$1" == "xunlock" ];then
+        echo $1 >  $logMonitorFileLock
+    else
+        logError "Usage:logMonitorSetLock lock/unlock"
+    fi
+}
+
+logMonitorLock(){
+    logMonitorSetLock "lock"
+}
+
+logMonitorUnLock(){
+    logMonitorSetLock "unlock"
+}
+
+##################################
+

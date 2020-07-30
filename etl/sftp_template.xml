@@ -1,0 +1,38 @@
+## downloadFile: download file from srcdir to desdir and bakdir
+<lftpIp>sftp://XX.XXX.XX.XX</lftpIp>
+<userName>XXX</userName>
+<password>XXX</password>
+<srcdir>/example/YYYYMM</srcdir>
+<desdir>/etldata/example/YYYYMM</desdir>
+<bakdir>/etldata/example/YYYYMM/bak</bakdir>
+<fileRegex>*[0-9]_example_[^ab]*</fileRegex>
+
+## base file and dir info set
+<badDir>/etldata/example/YYYYMM/bad</badDir>
+<outDir>/etldata/example/YYYYMM/out</outDir>
+<fileSrcDeli>\x80</fileSrcDeli>
+<fileOutDeli>\x001</fileOutDeli>
+
+## func to be executed
+<executeParam>downloadFile,uncompressFile,convertFile,removeHeadTail,removeChar,getField</executeParam>
+
+## getField: get file field according to its mode and pos info
+<fieldMode>0</fieldMode>
+<fieldPos>1,2,3,4,5,6,7</fieldPos>
+<fieldLen></fieldLen>
+<fieldNum>1,2,3,4,5,6,7</fieldNum>
+<outFileName>ORDER_MONTH_YYYYMM</outFileName>
+
+## removeHeadTail: remove head and tail
+<removeHeadRow></removeHeadRow>
+<removeTailRow></removeTailRow>
+
+## uncompressFile: file compressed type
+<compressType></compressType>
+
+## convertFile: convert file encode
+<srcEncodeType></srcEncodeType>
+<outEncodeType></outEncodeType>
+
+## removeChar: remove specific char from file
+<removeCharList><removeCharList>
