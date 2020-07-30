@@ -16,7 +16,7 @@ base_path=${etlBasePath}/..
 source ${base_path}/env/path.env
 
 ## set etl function
-source ${etlBasePath}/etl_function.sh
+source ${etlBasePath}/etl.func
 
 
 # log set
